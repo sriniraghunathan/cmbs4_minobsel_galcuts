@@ -1,4 +1,4 @@
-def get_lat_based_masks(nside, min_lat = -90., max_lat = 45., delta_lat = 15., rotate_to_radec = True):
+def get_lat_based_masks(nside, min_lat = -90., max_lat = 45., delta_lat = 15., rotate_to_radec = True, use_lat_steps = False):
     """
     #get lat-based masks in ra/dec coordinates
     """
@@ -11,7 +11,8 @@ def get_lat_based_masks(nside, min_lat = -90., max_lat = 45., delta_lat = 15., r
     lat_mask_arr = []
     for l1 in lat_arr[:-1]:
         l2 = l1 + delta_lat
-        l1 = lat_arr[0] #force l1 to be -90 deg.
+        if not use_lat_steps:
+            l1 = lat_arr[0] #force l1 to be -90 deg.
         curr_mask = np.zeros( npix )
         unmask_pixels = np.where( (theta_deg>=l1) & (theta_deg<l2) )[0]
         curr_mask[unmask_pixels] = 1.
@@ -28,14 +29,14 @@ def get_lat_based_masks(nside, min_lat = -90., max_lat = 45., delta_lat = 15., r
 
         lat_mask_arr.append(curr_mask)
 
-    #finally add all masks together
-    curr_mask = np.sum(lat_mask_arr, axis = 0)
-    curr_mask[curr_mask>threshold] = 1.
-    lat_mask_arr.append( curr_mask )
-    l1, l2 = lat_arr[0], lat_arr[-1]
-    hmask_dic[(l1, l2)] = curr_mask
-
-    #H.mollview( curr_mask ); H.graticule(); show(); sys.exit()
+    if use_lat_steps: #finally add all masks together
+        curr_mask = np.sum(lat_mask_arr, axis = 0)
+        curr_mask[curr_mask>threshold] = 1.
+        lat_mask_arr.append( curr_mask )
+        l1, l2 = lat_arr[0], lat_arr[-1]
+        hmask_dic[(l1, l2)] = curr_mask
+        
+        #H.mollview( curr_mask ); H.graticule(); show(); sys.exit()
 
     #return np.asarray( lat_mask_arr ) #these are lat masks in ra/dec coordinates
     return hmask_dic #these are lat masks in ra/dec coordinates
@@ -144,6 +145,7 @@ from astropy import units as u
 from astropy import coordinates as coord
 from astropy.coordinates import SkyCoord, EarthLocation
 
+use_lat_steps = True
 beam_to_use_for_smoothing = 0.5 #some rough smoothing
 threshold = 0.001
 nside = 512
@@ -152,7 +154,7 @@ dust_145ghz_fname = 'data/cmbs4_dust_uKCMB_LAT-MFL2_nside512_dust_0000.fits'
 dust_145ghz = H.read_map(dust_145ghz_fname)
 #dust_145ghz = H.ud_grade(dust_145ghz, nside)
 
-lat_mask_dic = get_lat_based_masks(nside)
+lat_mask_dic = get_lat_based_masks(nside, use_lat_steps = use_lat_steps)
 min_obs_el_err = [20., 25., 30., 35., 40.]
 op_dic = {}
 op_dic['hit_masks'] = {}
@@ -162,8 +164,9 @@ for min_obs_el in min_obs_el_err:
     op_dic['cl'][min_obs_el] = {}
     hmask = get_hmask(nside, min_obs_el = min_obs_el)
     op_dic['hit_masks'][min_obs_el] = hmask
-    fsky = len( np.where(hmask>0.)[0] )/len(hmask) #all inds with more than xx per cent hit    
-    print(beam_to_use_for_smoothing, min_obs_el, fsky)
+    fsky1 = len( np.where(hmask>0.)[0] )/len(hmask) #all inds with more than xx per cent hit    
+    fsky = np.sum( hmask[hmask>0.] )/len(hmask) #all inds with more than xx per cent hit    
+    print(beam_to_use_for_smoothing, min_obs_el, fsky1, fsky)
 
     '''
     H.mollview(hmask, min = 0., max = 1., coord = ['C', 'G'], sub=(2,3,1)); H.graticule(); title(r'Min. el = %g; fsky = %.3f' %(min_obs_el, fsky)); 
@@ -179,24 +182,31 @@ for min_obs_el in min_obs_el_err:
         print('\t(l1, l2) = (%g, %g)' %(l1, l2))
         lat_mask = lat_mask_dic[(l1, l2)]
         '''
-        fsky = len( np.where(hmask>0.)[0] )/len(hmask) #all inds with more than xx per cent hit    
+        fsky = np.sum( np.where(hmask>0.)[0] )/len(hmask) #all inds with more than xx per cent hit    
         H.mollview(hmask, min = 0., max = 1., sub = (1,3,1)); H.graticule(verbose = False); title(r'Min. el = %g; fsky = %.3f' %(min_obs_el, fsky));
 
-        hmask_with_gal_cut = hmask * lat_mask
-        fsky = len( np.where(hmask_with_gal_cut>0.)[0] )/len(hmask_with_gal_cut) #all inds with more than xx per cent hit    
         H.mollview(hmask_with_gal_cut, min = 0., max = 1., sub = (1,3,2)); H.graticule(verbose = False); title(r'Min. el = %g; fsky = %.3f' %(min_obs_el, fsky)); 
 
         curr_dust_map = hmask * lat_mask * dust_145ghz
         H.mollview(curr_dust_map, sub = (1,3,3)); H.graticule(verbose = False); title(r'Min. el = %g; fsky = %.3f' %(min_obs_el, fsky)); show(); 
         H.mollview(curr_dust_map); H.graticule(verbose = False); show()
         '''
+        hmask_with_gal_cut = hmask * lat_mask
+        #fsky = len( np.where(hmask_with_gal_cut>0.)[0] )/len(hmask_with_gal_cut) #all inds with more than xx per cent hit
+        fsky = np.sum( hmask_with_gal_cut[hmask_with_gal_cut>0.])/len(hmask_with_gal_cut) #all inds with more than xx per cent hit
+
         curr_mask = hmask * lat_mask 
         curr_dust_map = curr_mask * np.copy( dust_145ghz )
         cl = H.anafast(curr_dust_map, lmax = lmax)
+        cl = cl/fsky
         op_dic['cl'][min_obs_el][(l1,l2)] = cl
 
 op_dic['dust_145ghz'] = dust_145ghz
-opfname = 'results/splat_hitmask_galmask_galdustcl.npy'
+if not use_lat_steps:
+    opfname = 'results/splat_hitmask_galmask_galdustcl.npy'
+else:
+    opfname = 'results/splat_hitmask_galmask_galdustcl_latsteps.npy'
+np.save(opfname, op_dic)
 sys.exit()
 
 
