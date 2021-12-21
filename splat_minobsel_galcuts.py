@@ -145,13 +145,13 @@ from astropy import units as u
 from astropy import coordinates as coord
 from astropy.coordinates import SkyCoord, EarthLocation
 
-use_lat_steps = True
+use_lat_steps = False #True
 beam_to_use_for_smoothing = 0.5 #some rough smoothing
 threshold = 0.001
 nside = 512
 lmax = 512
 dust_145ghz_fname = 'data/cmbs4_dust_uKCMB_LAT-MFL2_nside512_dust_0000.fits'
-dust_145ghz = H.read_map(dust_145ghz_fname)
+dust_145ghz = H.read_map(dust_145ghz_fname, field = (0, 1, 2))
 #dust_145ghz = H.ud_grade(dust_145ghz, nside)
 
 lat_mask_dic = get_lat_based_masks(nside, use_lat_steps = use_lat_steps)
@@ -166,7 +166,7 @@ for min_obs_el in min_obs_el_err:
     op_dic['hit_masks'][min_obs_el] = hmask
     fsky1 = len( np.where(hmask>0.)[0] )/len(hmask) #all inds with more than xx per cent hit    
     fsky = np.sum( hmask[hmask>0.] )/len(hmask) #all inds with more than xx per cent hit    
-    print(beam_to_use_for_smoothing, min_obs_el, fsky1, fsky)
+    #print(beam_to_use_for_smoothing, min_obs_el, fsky1, fsky, np.mean(hmask)); sys.exit()
 
     '''
     H.mollview(hmask, min = 0., max = 1., coord = ['C', 'G'], sub=(2,3,1)); H.graticule(); title(r'Min. el = %g; fsky = %.3f' %(min_obs_el, fsky)); 
@@ -194,7 +194,7 @@ for min_obs_el in min_obs_el_err:
         hmask_with_gal_cut = hmask * lat_mask
         #fsky = len( np.where(hmask_with_gal_cut>0.)[0] )/len(hmask_with_gal_cut) #all inds with more than xx per cent hit
         fsky = np.sum( hmask_with_gal_cut[hmask_with_gal_cut>0.])/len(hmask_with_gal_cut) #all inds with more than xx per cent hit
-
+        
         curr_mask = hmask * lat_mask 
         curr_dust_map = curr_mask * np.copy( dust_145ghz )
         cl = H.anafast(curr_dust_map, lmax = lmax)
