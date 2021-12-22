@@ -2,7 +2,7 @@ def get_lat_based_masks(nside, max_lat_mask = 50., delta_lat = 10., rotate_to_ra
     """
     #get lat-based masks in ra/dec coordinates
     """
-    lat_arr = np.arange( delta_lat, max_lat_mask+1., delta_lat)
+    lat_arr = np.arange( 0., max_lat_mask+1., delta_lat)
 
     hmask_dic = {}
     npix = H.nside2npix( nside )
@@ -193,7 +193,7 @@ for min_obs_el in min_obs_el_err:
     op_dic['hit_masks'][min_obs_el] = hmask
     fsky1 = len( np.where(hmask>0.)[0] )/len(hmask) #all inds with more than xx per cent hit    
     fsky = np.sum( hmask[hmask>0.] )/len(hmask) #all inds with more than xx per cent hit    
-    print(beam_to_use_for_smoothing, min_obs_el, fsky1, fsky, np.mean(hmask)); #sys.exit()
+    print(beam_to_use_for_smoothing, 0.5*(1-np.sin(np.radians(min_obs_el))), min_obs_el, fsky1, fsky, np.mean(hmask)); #sys.exit()
 
     '''
     H.mollview(hmask, min = 0., max = 1., coord = ['C', 'G'], sub=(2,3,1)); H.graticule(); title(r'Min. el = %g; fsky = %.3f' %(min_obs_el, fsky)); 
