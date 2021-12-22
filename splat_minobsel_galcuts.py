@@ -24,49 +24,6 @@ def get_lat_based_masks(nside, max_lat_mask = 50., delta_lat = 10., rotate_to_ra
 
     return hmask_dic #these are lat masks in ra/dec coordinates
 
-def get_lat_based_masks_v1(nside, min_lat = -90., max_lat = 45., delta_lat = 15., rotate_to_radec = True, use_lat_steps = False):
-    """
-    #get lat-based masks in ra/dec coordinates
-    """
-    lat_arr = np.arange( min_lat, max_lat + 1., delta_lat )
-
-    hmask_dic = {}
-    npix = H.nside2npix( nside )
-    phi_deg, theta_deg = H.pix2ang( nside, np.arange(npix), lonlat = 1 )
-    
-    lat_mask_arr = []
-    for l1 in lat_arr[:-1]:
-        l2 = l1 + delta_lat
-        if not use_lat_steps:
-            l1 = lat_arr[0] #force l1 to be -90 deg.
-        curr_mask = np.zeros( npix )
-        unmask_pixels = np.where( (theta_deg>=l1) & (theta_deg<l2) )[0]
-        curr_mask[unmask_pixels] = 1.
-
-        if rotate_to_radec:#rotate to ra/dec
-            curr_mask = healpix_rotate_coords(curr_mask, coord = ['G', 'C'])
-
-        #H.mollview( curr_mask, sub = (2,2,1)); H.graticule();
-        #H.mollview( cmbs4_hit_map, sub = (2,2,2)); H.graticule(); show()
-
-        #H.mollview( curr_mask ); H.graticule(); show()
-        print((l1, l2))
-        hmask_dic[(l1, l2)] = curr_mask
-
-        lat_mask_arr.append(curr_mask)
-
-    if use_lat_steps: #finally add all masks together
-        curr_mask = np.sum(lat_mask_arr, axis = 0)
-        curr_mask[curr_mask>threshold] = 1.
-        curr_mask[curr_mask<threshold] = 0.
-        lat_mask_arr.append( curr_mask )
-        l1, l2 = lat_arr[0], lat_arr[-1]
-        hmask_dic[(l1, l2)] = curr_mask
-        
-    #H.mollview( curr_mask ); H.graticule(); show(); sys.exit()
-
-    #return np.asarray( lat_mask_arr ) #these are lat masks in ra/dec coordinates
-    return hmask_dic #these are lat masks in ra/dec coordinates
 def healpix_rotate_coords(hmap, coord):
     """
     coord = ['C', 'G'] to convert a map in radec to galactic coordinates or vice versa.
@@ -104,14 +61,7 @@ def set_telescope_observer(lat = -89.991066, lon = -44.65, elevation = 2835.0, a
     elif location == 'chile':
         lat, lon, elevation = -22.57, -67.47, 5200. #Chile
     '''
-    if not astropy:
-        splat = ephem.Observer()
-        splat.lat = np.radians(lat)
-        splat.lon = np.radians(lon)
-        splat.elevation = elevation # in meters
-    else:
-        ##splat = EarthLocation.from_geodetic(lon* u.degree, lat* u.degree, height = elevation*u.meter)
-        splat = coord.EarthLocation(lat=lat*u.deg,lon=lon*u.deg, height=elevation*u.meter)
+    splat = coord.EarthLocation(lat=lat*u.deg,lon=lon*u.deg, height=elevation*u.meter)
 
     return splat
 
@@ -197,16 +147,14 @@ for min_obs_el in min_obs_el_err:
 
     '''
     H.mollview(hmask, min = 0., max = 1., coord = ['C', 'G'], sub=(2,3,1)); H.graticule(); title(r'Min. el = %g; fsky = %.3f' %(min_obs_el, fsky)); 
-    H.mollview(lat_mask_dic[(-90.0, 45.0)], min = 0., max = 1., coord = ['C', 'G'], sub=(2,3,2)); H.graticule(); title(r'Min. el = %g; fsky = %.3f' %(min_obs_el, fsky)); 
-    H.mollview(hmask * lat_mask_dic[(-90.0, 45.0)], min = 0., max = 1., coord = ['C', 'G'], sub=(2,3,3)); H.graticule(); title(r'Min. el = %g; fsky = %.3f' %(min_obs_el, fsky));
+    H.mollview(lat_mask_dic[0.], min = 0., max = 1., coord = ['C', 'G'], sub=(2,3,2)); H.graticule(); title(r'Min. el = %g; fsky = %.3f' %(min_obs_el, fsky)); 
+    H.mollview(hmask * lat_mask_dic[0.], min = 0., max = 1., coord = ['C', 'G'], sub=(2,3,3)); H.graticule(); title(r'Min. el = %g; fsky = %.3f' %(min_obs_el, fsky));
 
     H.mollview(hmask, min = 0., max = 1., sub=(2,3,4)); H.graticule(); title(r'Min. el = %g; fsky = %.3f' %(min_obs_el, fsky)); 
-    H.mollview(lat_mask_dic[(-90.0, 45.0)], min = 0., max = 1., sub=(2,3,5)); H.graticule(); title(r'Min. el = %g; fsky = %.3f' %(min_obs_el, fsky)); 
-    H.mollview(hmask * lat_mask_dic[(-90.0, 45.0)], min = 0., max = 1., sub=(2,3,6)); H.graticule(); title(r'Min. el = %g; fsky = %.3f' %(min_obs_el, fsky)); show(); sys.exit()
+    H.mollview(lat_mask_dic[0.], min = 0., max = 1., sub=(2,3,5)); H.graticule(); title(r'Min. el = %g; fsky = %.3f' %(min_obs_el, fsky)); 
+    H.mollview(hmask * lat_mask_dic[0.], min = 0., max = 1., sub=(2,3,6)); H.graticule(); title(r'Min. el = %g; fsky = %.3f' %(min_obs_el, fsky)); show(); sys.exit()
     '''
 
-    #for (l1, l2) in lat_mask_dic:
-        #lat_mask = lat_mask_dic[(l1, l2)]
     for bval in lat_mask_dic:
         lat_mask = lat_mask_dic[bval]
         '''
@@ -235,12 +183,6 @@ for min_obs_el in min_obs_el_err:
         op_dic['cl'][min_obs_el][bval] = cl
 
 op_dic['dust_145ghz'] = dust_145ghz
-'''
-if not use_lat_steps:
-    opfname = 'results/splat_hitmask_galmask_galdustcl.npy'
-else:
-    opfname = 'results/splat_hitmask_galmask_galdustcl_latsteps.npy'
-'''
 opfname = 'results/splat_hitmask_galmask_galdustcl.npy'
 np.save(opfname, op_dic)
 sys.exit()
