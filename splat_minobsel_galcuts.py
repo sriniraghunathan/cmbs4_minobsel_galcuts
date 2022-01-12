@@ -65,7 +65,7 @@ def set_telescope_observer(lat = -89.991066, lon = -44.65, elevation = 2835.0, a
 
     return splat
 
-def get_hmask(nside, min_obs_el, max_obs_el = 85., timearr = None, ra_dec_arr = None, yyyy = 2029, delta_mm = 1, delta_dd = 30., delta_hh = 24., location = 'southpole'):#, epoch = 'J2000'):
+def get_footprint_for_min_obs_el(nside, min_obs_el, max_obs_el = 85., timearr = None, ra_dec_arr = None, yyyy = 2029, delta_mm = 1, delta_dd = 30., delta_hh = 24., location = 'southpole'):#, epoch = 'J2000'):
     if ra_dec_arr is None:
         raarr = np.arange(-180, 180., 0.1)
         decarr = np.arange(-90., 90., 0.1)
@@ -139,7 +139,7 @@ op_dic['lat_masks'] = lat_mask_dic
 op_dic['cl'] = {}
 for min_obs_el in min_obs_el_err:
     op_dic['cl'][min_obs_el] = {}
-    hmask = get_hmask(nside, min_obs_el = min_obs_el)
+    hmask = get_footprint_for_min_obs_el(nside, min_obs_el = min_obs_el)
     op_dic['hit_masks'][min_obs_el] = hmask
     fsky1 = len( np.where(hmask>0.)[0] )/len(hmask) #all inds with more than xx per cent hit    
     fsky = np.sum( hmask[hmask>0.] )/len(hmask) #all inds with more than xx per cent hit    
